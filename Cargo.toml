@@ -1,0 +1,21 @@
+[package]
+name = "dvd-render"
+version = "0.1.0"
+edition = "2024"
+description = "render a sequence of terminal screens, optionally encoding them to a video file"
+categories = [ "multimedia::video", "rendering::engine" ]
+authors = [ "James Connolly <me@j-conn.com>" ]
+license = "MPL-2.0"
+repository = "https://github.com/james-conn/dvd-video"
+
+[dependencies]
+ab_glyph = "0.2"
+wgpu = "25"
+image = { version = "0.25", default-features = false }
+gstreamer = { version = "0.23", optional = true }
+gstreamer-app = { version = "0.23", optional = true }
+gstreamer-video = { version = "0.23", optional = true }
+gstreamer-pbutils = { version = "0.23", optional = true }
+
+[features]
+video = [ "dep:gstreamer", "dep:gstreamer-app", "dep:gstreamer-video", "dep:gstreamer-pbutils" ]
