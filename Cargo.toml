@@ -6,7 +6,7 @@ description = "render a sequence of terminal screens, optionally encoding them t
 categories = [ "multimedia::video", "rendering::engine" ]
 authors = [ "James Connolly <me@j-conn.com>" ]
 license = "MPL-2.0"
-repository = "https://github.com/james-conn/dvd-video"
+repository = "https://github.com/james-conn/dvd-render"
 
 [dependencies]
 ab_glyph = "0.2"
