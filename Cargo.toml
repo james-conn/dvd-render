@@ -8,6 +8,13 @@ authors = [ "James Connolly <me@j-conn.com>" ]
 license = "MPL-2.0"
 repository = "https://github.com/james-conn/dvd-render"
 
+include = [
+	"/Cargo.toml",
+	"/src/*.rs",
+	"/src/shader.wgsl",
+	"LICENSE"
+]
+
 [dependencies]
 ab_glyph = "0.2"
 wgpu = "25"
