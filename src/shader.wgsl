@@ -5,6 +5,7 @@
 @group(0) @binding(4) var<uniform> grid_height: u32;
 @group(0) @binding(5) var<uniform> img_width: u32;
 @group(0) @binding(6) var<uniform> img_height: u32;
+@group(0) @binding(7) var<storage, read> color_grid: array<u32>;
 
 fn img_idx(x: u64, y: u64) -> u64 {
 	return (y * u64(img_width)) + x;
@@ -25,6 +26,10 @@ fn atlas_idx(gidx: u32) -> u32 {
 	return idx_grid[gidx];
 }
 
+fn sample_colors(gidx: u32) -> vec2<u32> {
+	return vec2(color_grid[gidx * 2], color_grid[(gidx * 2) + 1]);
+}
+
 fn atlas_val_at(aidx: u32, rg_pos: vec2<u32>, glyph_size: vec2<u32>) -> u32 {
 	let ax = rg_pos.x;
 	let ay = (aidx * glyph_size.y) + rg_pos.y;
@@ -33,6 +38,14 @@ fn atlas_val_at(aidx: u32, rg_pos: vec2<u32>, glyph_size: vec2<u32>) -> u32 {
 	let n_byte = abidx % 4;
 
 	return unpack4xU8(atlas[qidx])[n_byte];
+}
+
+// lerp between `a` and `b` from `t=0` to `t=255`
+fn qlerp(a: vec4<u32>, b: vec4<u32>, t: u32) -> vec4<u32> {
+	let a1 = a * t;
+	let b1 = b * (255 - t);
+
+	return (a1 + b1) / 255;
 }
 
 @compute @workgroup_size(16, 16, 1)
@@ -52,6 +65,9 @@ fn sample_atlas(@builtin(global_invocation_id) global_id: vec3<u32>) {
 	let rg_pos = rel_grid_pos(img_pos, glyph_size);
 	let aidx = atlas_idx(gidx);
 
-	let c = atlas_val_at(aidx, rg_pos, glyph_size);
-	output_img[img_idx] = pack4xU8(vec4(c, c, c, 255));
+	let cov = atlas_val_at(aidx, rg_pos, glyph_size);
+	let cols = sample_colors(gidx);
+	let fg_col = unpack4xU8(cols[0]);
+	let bg_col = unpack4xU8(cols[1]);
+	output_img[img_idx] = pack4xU8(qlerp(fg_col, bg_col, cov));
 }

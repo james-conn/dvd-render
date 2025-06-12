@@ -26,6 +26,14 @@ impl<const W: usize, const H: usize> Frame<W, H> {
 			}).flat_map(u32::to_ne_bytes)
 		}).collect()
 	}
+
+	pub(crate) fn serialize_colors(&self) -> Vec<u8> {
+		self.grid.cells().iter().flat_map(|row| {
+			row.iter().flat_map(|cell| {
+				[cell.fg_color().0, cell.bg_color().0]
+			}).flatten()
+		}).collect()
+	}
 }
 
 pub enum FontSize {

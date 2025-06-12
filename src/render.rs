@@ -18,6 +18,7 @@ pub struct WgpuRenderer<const W: usize, const H: usize> {
 	queue: wgpu::Queue,
 	idx_grid: wgpu::Buffer,
 	output_img: wgpu::Buffer,
+	color_grid: wgpu::Buffer,
 	pipeline: wgpu::ComputePipeline,
 	bind_group: wgpu::BindGroup,
 	output_width: u32,
@@ -113,6 +114,13 @@ impl<const W: usize, const H: usize> WgpuRenderer<W, H> {
 		queue.write_buffer(&img_width_uniform, 0, &output_width.to_ne_bytes());
 		queue.write_buffer(&img_height_uniform, 0, &output_height.to_ne_bytes());
 
+		let color_grid = device.create_buffer(&wgpu::BufferDescriptor {
+			label: Some("color_grid"),
+			size: (W * H * 8) as u64,
+			usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::STORAGE,
+			mapped_at_creation: false
+		});
+
 		let shader = device.create_shader_module(wgpu::include_wgsl!("shader.wgsl"));
 
 		let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
@@ -200,6 +208,19 @@ impl<const W: usize, const H: usize> WgpuRenderer<W, H> {
 						min_binding_size: None
 					},
 					count: None
+				},
+				// color_grid
+				wgpu::BindGroupLayoutEntry {
+					binding: 7,
+					visibility: wgpu::ShaderStages::COMPUTE,
+					ty: wgpu::BindingType::Buffer {
+						ty: wgpu::BufferBindingType::Storage {
+							read_only: true
+						},
+						has_dynamic_offset: false,
+						min_binding_size: None
+					},
+					count: None
 				}
 			]
 		});
@@ -250,6 +271,10 @@ impl<const W: usize, const H: usize> WgpuRenderer<W, H> {
 				wgpu::BindGroupEntry {
 					binding: 6,
 					resource: img_height_uniform.as_entire_binding()
+				},
+				wgpu::BindGroupEntry {
+					binding: 7,
+					resource: color_grid.as_entire_binding()
 				}
 			]
 		});
@@ -264,7 +289,8 @@ impl<const W: usize, const H: usize> WgpuRenderer<W, H> {
 			pipeline,
 			bind_group,
 			output_width,
-			output_height
+			output_height,
+			color_grid
 		}
 	}
 }
@@ -302,6 +328,7 @@ impl<const W: usize, const H: usize> Iterator for WgpuRenderer<W, H> {
 		});
 
 		let frame_hold = frame.frame_hold;
+		self.queue.write_buffer(&self.color_grid, 0, &frame.serialize_colors());
 		self.queue.write_buffer(&self.idx_grid, 0, &frame.serialize(&self.lut));
 
 		let mut compute_pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {

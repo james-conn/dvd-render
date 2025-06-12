@@ -1,4 +1,5 @@
 pub use ab_glyph;
+pub use image;
 
 pub mod grid;
 pub mod sequence;
