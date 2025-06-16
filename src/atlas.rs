@@ -44,7 +44,6 @@ pub(crate) fn populate_atlas<const W: usize, const H: usize, F: Font>(font: F, s
 
 	for (i, glyph_char) in sequence.glyph_set().iter().enumerate() {
 		let glyph = font.scaled_glyph(*glyph_char);
-		let baseline_offset = -font.descent() as u32;
 		let Some(outline) = font.outline_glyph(glyph) else {
 			// if no outline is present just skip drawing
 			lut.insert(*glyph_char, i as u32);
@@ -57,13 +56,7 @@ pub(crate) fn populate_atlas<const W: usize, const H: usize, F: Font>(font: F, s
 		let px_bounds = outline.px_bounds();
 		let glyph_width = px_bounds.width() as u32;
 
-		// annoying math for figuring out the proper y offset so that letters
-		// which descend below the baseline (like 'g' or 'p') get rendered properly
-		let baseline = font_height - baseline_offset;
-		let glyph_gap_to_baseline = baseline.checked_sub(px_bounds.height() as u32)
-			.expect("either your font is wrong or my math is wrong (which is very possible)");
-		let glyph_below_baseline = px_bounds.max.y as u32;
-		let baseline_diff = glyph_gap_to_baseline + glyph_below_baseline;
+		let baseline_diff = font_height - (-px_bounds.min.y - font.descent()) as u32;
 
 		outline.draw(|x, y, c| {
 			let luma = (c * u8::MAX as f32) as u8;
