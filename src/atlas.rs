@@ -1,5 +1,4 @@
 use ab_glyph::{Font, ScaleFont};
-use wgpu::COPY_BUFFER_ALIGNMENT as ALIGN;
 use std::collections::{HashMap, HashSet};
 use crate::sequence::GridSequence;
 
@@ -8,11 +7,6 @@ pub(crate) struct Atlas {
 	pub lut: HashMap<char, u32>,
 	pub font_width: u32,
 	pub font_height: u32
-}
-
-// partially aesthetic, partially a `wgpu` hack for buffer alignment
-fn round_up_aligned(n: u32) -> u32 {
-	(ALIGN as u32 * (n / ALIGN as u32)) + ALIGN as u32
 }
 
 // upper bound of size for the biggest glyph
@@ -29,8 +23,7 @@ fn font_size<F: Font, SF: ScaleFont<F>>(font: &SF, glyph_set: &HashSet<char>) ->
 	}
 
 	assert!(font_width != f32::MIN && font_height != f32::MIN, "font has no glyphs");
-
-	(round_up_aligned(font_width as u32), round_up_aligned(font_height as u32))
+	(font_width as u32, font_height as u32)
 }
 
 pub(crate) fn populate_atlas<const W: usize, const H: usize, F: Font>(font: F, sequence: &GridSequence<W, H>) -> Atlas {

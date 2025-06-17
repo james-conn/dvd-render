@@ -17,12 +17,18 @@ pub struct WgpuRenderer<const W: usize, const H: usize> {
 	device: wgpu::Device,
 	queue: wgpu::Queue,
 	idx_grid: wgpu::Buffer,
-	output_img: wgpu::Buffer,
+	output_img: wgpu::Texture,
 	color_grid: wgpu::Buffer,
 	pipeline: wgpu::ComputePipeline,
 	bind_group: wgpu::BindGroup,
 	output_width: u32,
 	output_height: u32
+}
+
+fn round_up_aligned(n: u32) -> u32 {
+	use wgpu::COPY_BYTES_PER_ROW_ALIGNMENT as ALIGN;
+
+	(ALIGN * (n / ALIGN)) + ALIGN
 }
 
 impl<const W: usize, const H: usize> WgpuRenderer<W, H> {
@@ -42,13 +48,13 @@ impl<const W: usize, const H: usize> WgpuRenderer<W, H> {
 
 		let adapter = instance.request_adapter(&wgpu::RequestAdapterOptions::default()).await.unwrap();
 		// I expect that the size of the atlas should be bounded by the size of the output
-		let max_buf_size = output_width * output_height * 4;
+		let max_buf_size = round_up_aligned(output_width * 4) as u64 * output_height as u64;
 
 		let (device, queue) = adapter.request_device(&wgpu::DeviceDescriptor {
 			required_features: wgpu::Features::SHADER_INT64,
 			required_limits: wgpu::Limits {
-				max_buffer_size: max_buf_size as u64,
-				max_storage_buffer_binding_size: max_buf_size,
+				max_buffer_size: max_buf_size,
+				max_texture_dimension_2d: output_width.max(output_height),
 				..wgpu::Limits::default()
 			},
 			memory_hints: wgpu::MemoryHints::Performance,
@@ -73,11 +79,21 @@ impl<const W: usize, const H: usize> WgpuRenderer<W, H> {
 		// TODO: investigate efficiency of `write_buffer`
 		queue.write_buffer(&atlas, 0, &populated_atlas.buffer);
 
-		let output_img = device.create_buffer(&wgpu::BufferDescriptor {
-			label: Some("output_buf"),
-			size: output_width as u64 * output_height as u64 * 4,
-			usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_SRC,
-			mapped_at_creation: false
+		let output_img_size = wgpu::Extent3d {
+			width: output_width,
+			height: output_height,
+			depth_or_array_layers: 1
+		};
+
+		let output_img = device.create_texture(&wgpu::TextureDescriptor {
+			label: Some("output_img"),
+			size: output_img_size,
+			mip_level_count: 1,
+			sample_count: 1,
+			dimension: wgpu::TextureDimension::D2,
+			format: wgpu::TextureFormat::Rgba8Uint,
+			usage: wgpu::TextureUsages::STORAGE_BINDING | wgpu::TextureUsages::COPY_SRC,
+			view_formats: &[]
 		});
 
 		let grid_width_uniform = device.create_buffer(&wgpu::BufferDescriptor {
@@ -156,12 +172,10 @@ impl<const W: usize, const H: usize> WgpuRenderer<W, H> {
 				wgpu::BindGroupLayoutEntry {
 					binding: 2,
 					visibility: wgpu::ShaderStages::COMPUTE,
-					ty: wgpu::BindingType::Buffer {
-						ty: wgpu::BufferBindingType::Storage {
-							read_only: false
-						},
-						has_dynamic_offset: false,
-						min_binding_size: None
+					ty: wgpu::BindingType::StorageTexture {
+						access: wgpu::StorageTextureAccess::WriteOnly,
+						format: wgpu::TextureFormat::Rgba8Uint,
+						view_dimension: wgpu::TextureViewDimension::D2
 					},
 					count: None
 				},
@@ -254,7 +268,19 @@ impl<const W: usize, const H: usize> WgpuRenderer<W, H> {
 				},
 				wgpu::BindGroupEntry {
 					binding: 2,
-					resource: output_img.as_entire_binding()
+					resource: wgpu::BindingResource::TextureView(
+						&output_img.create_view(&wgpu::TextureViewDescriptor {
+							label: Some("output_img_view"),
+							format: Some(wgpu::TextureFormat::Rgba8Uint),
+							dimension: Some(wgpu::TextureViewDimension::D2),
+							usage: Some(wgpu::TextureUsages::STORAGE_BINDING),
+							aspect: wgpu::TextureAspect::All,
+							base_mip_level: 0,
+							mip_level_count: None,
+							base_array_layer: 0,
+							array_layer_count: None
+						})
+					)
 				},
 				wgpu::BindGroupEntry {
 					binding: 3,
@@ -301,9 +327,16 @@ pub struct RenderedFrame {
 }
 
 impl RenderedFrame {
-	fn deserialize(width: u32, height: u32, data: Vec<u8>, frame_hold: NonZeroU8) -> Self {
+	fn deserialize(width: u32, height: u32, data: Vec<u8>, frame_hold: NonZeroU8, bytes_per_row: usize) -> Self {
 		Self {
-			img: image::RgbaImage::from_raw(width, height, data).unwrap(),
+			img: image::RgbaImage::from_raw(
+				width,
+				height,
+				data.chunks(bytes_per_row)
+					.flat_map(|c| &c[..(width as usize * 4)])
+					.copied()
+					.collect()
+			).unwrap(),
 			frame_hold
 		}
 	}
@@ -344,18 +377,35 @@ impl<const W: usize, const H: usize> Iterator for WgpuRenderer<W, H> {
 		);
 		drop(compute_pass);
 
-		let pixels = self.output_width * self.output_height;
+		let padded_bytes_width = round_up_aligned(self.output_width * 4);
+		let padded_bytes = padded_bytes_width * self.output_height;
 		let map_buf = self.device.create_buffer(&wgpu::BufferDescriptor {
 			label: Some("map_buf"),
-			size: pixels as u64 * 4,
+			size: padded_bytes as u64,
 			usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::MAP_READ,
 			mapped_at_creation: false
 		});
 
-		encoder.copy_buffer_to_buffer(
-			&self.output_img, 0,
-			&map_buf, 0,
-			pixels as u64 * 4
+		encoder.copy_texture_to_buffer(
+			wgpu::TexelCopyTextureInfo {
+				texture: &self.output_img,
+				mip_level: 0,
+				origin: wgpu::Origin3d::ZERO,
+				aspect: wgpu::TextureAspect::All
+			},
+			wgpu::TexelCopyBufferInfo {
+				buffer: &map_buf,
+				layout: wgpu::TexelCopyBufferLayout {
+					offset: 0,
+					bytes_per_row: Some(padded_bytes_width),
+					rows_per_image: Some(self.output_height)
+				}
+			},
+			wgpu::Extent3d {
+				width: self.output_width,
+				height: self.output_height,
+				depth_or_array_layers: 1
+			}
 		);
 
 		self.queue.submit(std::iter::once(encoder.finish()));
@@ -368,7 +418,8 @@ impl<const W: usize, const H: usize> Iterator for WgpuRenderer<W, H> {
 			self.output_width,
 			self.output_height,
 			serialized_data,
-			frame_hold
+			frame_hold,
+			padded_bytes_width as usize
 		))
 	}
 }

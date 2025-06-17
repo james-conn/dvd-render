@@ -1,15 +1,11 @@
 @group(0) @binding(0) var<storage, read> idx_grid: array<u32>;
 @group(0) @binding(1) var<storage, read> atlas: array<u32>;
-@group(0) @binding(2) var<storage, read_write> output_img: array<u32>;
+@group(0) @binding(2) var output_img: texture_storage_2d<rgba8uint, write>;
 @group(0) @binding(3) var<uniform> grid_width: u32;
 @group(0) @binding(4) var<uniform> grid_height: u32;
 @group(0) @binding(5) var<uniform> img_width: u32;
 @group(0) @binding(6) var<uniform> img_height: u32;
 @group(0) @binding(7) var<storage, read> color_grid: array<u32>;
-
-fn img_idx(x: u64, y: u64) -> u64 {
-	return (y * u64(img_width)) + x;
-}
 
 fn grid_idx(img_pos: vec2<u32>) -> u32 {
 	let gx = (img_pos.x * grid_width) / img_width;
@@ -60,7 +56,6 @@ fn sample_atlas(@builtin(global_invocation_id) global_id: vec3<u32>) {
 		img_height / grid_height
 	);
 
-	let img_idx = img_idx(u64(global_id.x), u64(global_id.y));
 	let gidx = grid_idx(img_pos);
 	let rg_pos = rel_grid_pos(img_pos, glyph_size);
 	let aidx = atlas_idx(gidx);
@@ -69,5 +64,5 @@ fn sample_atlas(@builtin(global_invocation_id) global_id: vec3<u32>) {
 	let cols = sample_colors(gidx);
 	let fg_col = unpack4xU8(cols[0]);
 	let bg_col = unpack4xU8(cols[1]);
-	output_img[img_idx] = pack4xU8(qlerp(fg_col, bg_col, cov));
+	textureStore(output_img, img_pos, qlerp(fg_col, bg_col, cov));
 }
