@@ -328,14 +328,18 @@ pub struct RenderedFrame {
 
 impl RenderedFrame {
 	fn deserialize(width: u32, height: u32, data: Vec<u8>, frame_hold: NonZeroU8, bytes_per_row: usize) -> Self {
+		let mut buf = Vec::with_capacity(width as usize * height as usize * 4);
+		let used_row_bytes = width as usize * 4;
+
+		for row in data.chunks(bytes_per_row) {
+			buf.extend_from_slice(&row[..used_row_bytes]);
+		}
+
 		Self {
 			img: image::RgbaImage::from_raw(
 				width,
 				height,
-				data.chunks(bytes_per_row)
-					.flat_map(|c| &c[..(width as usize * 4)])
-					.copied()
-					.collect()
+				buf
 			).unwrap(),
 			frame_hold
 		}
