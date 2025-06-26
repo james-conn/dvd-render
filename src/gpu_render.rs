@@ -6,14 +6,14 @@ use crate::atlas::populate_atlas;
 use crate::render::{RenderedFrame, VideoSrc};
 
 #[inline]
-fn compute_output_size<const W: usize, const H: usize>(font_width: u32, font_height: u32) -> (u32, u32) {
-	let output_width = W as u32 * font_width;
-	let output_height = H as u32 * font_height;
+fn compute_output_size(grid_width: u32, grid_height: u32, font_width: u32, font_height: u32) -> (u32, u32) {
+	let output_width = grid_width * font_width;
+	let output_height = grid_height * font_height;
 	(output_width, output_height)
 }
 
-pub struct WgpuRenderer<const W: usize, const H: usize> {
-	sequence: GridSequence<W, H>,
+pub struct WgpuRenderer {
+	sequence: GridSequence,
 	lut: HashMap<char, u32>,
 	device: wgpu::Device,
 	queue: wgpu::Queue,
@@ -32,8 +32,8 @@ fn round_up_aligned(n: u32) -> u32 {
 	(ALIGN * (n / ALIGN)) + ALIGN
 }
 
-impl<const W: usize, const H: usize> WgpuRenderer<W, H> {
-	pub async fn new<F: Font>(font: F, sequence: GridSequence<W, H>) -> Self {
+impl WgpuRenderer {
+	pub async fn new<F: Font>(font: F, sequence: GridSequence) -> Self {
 		let populated_atlas = populate_atlas(font, &sequence);
 
 		let (output_width, output_height) = compute_output_size::<W, H>(

@@ -38,7 +38,7 @@ fn font_size<F: Font, SF: ScaleFont<F>>(font: &SF, glyph_set: &HashSet<char>) ->
 	(round_up_aligned(font_width as u32), round_up_aligned(font_height as u32))
 }
 
-pub(crate) fn populate_atlas<const W: usize, const H: usize, F: Font>(font: F, sequence: &GridSequence<W, H>) -> Atlas {
+pub(crate) fn populate_atlas<F: Font>(font: F, sequence: &GridSequence) -> Atlas {
 	let font = font.as_scaled(sequence.resolve_px_scale(&font));
 
 	let (font_width, font_height) = font_size(&font, sequence.glyph_set());

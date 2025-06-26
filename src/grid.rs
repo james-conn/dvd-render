@@ -69,19 +69,17 @@ impl GridCell {
 }
 
 #[derive(Clone)]
-pub struct Grid<const W: usize, const H: usize> {
-	cells: [[GridCell; W]; H]
+pub struct Grid {
+	cells: Vec<Vec<GridCell>>
 }
 
-impl<const W: usize, const H: usize> Default for Grid<W, H> {
-	fn default() -> Self {
+impl Grid {
+	pub fn new(width: usize, height: usize) -> Self {
 		Self {
-			cells: [[GridCell::space(); W]; H]
+			cells: vec![vec![GridCell::space(); width]; height]
 		}
 	}
-}
 
-impl<const W: usize, const H: usize> Grid<W, H> {
 	/// panics if out of bounds
 	pub fn set(&mut self, x: usize, y: usize, c: GridCell) {
 		self.cells[y][x] = c;
@@ -98,7 +96,7 @@ impl<const W: usize, const H: usize> Grid<W, H> {
 	pub(crate) fn chars(&self) -> Vec<char> {
 		let mut chars = vec![];
 
-		for row in self.cells {
+		for row in &self.cells {
 			for cell in row {
 				if !chars.contains(&cell.character) {
 					chars.push(cell.character);
@@ -110,7 +108,9 @@ impl<const W: usize, const H: usize> Grid<W, H> {
 	}
 
 	#[inline]
-	pub(crate) fn cells(&self) -> &[[GridCell; W]; H] {
-		&self.cells
+	pub(crate) fn cells(&self) -> Vec<&[GridCell]> {
+		self.cells.iter()
+			.map(Vec::as_slice)
+			.collect()
 	}
 }

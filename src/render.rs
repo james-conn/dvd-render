@@ -8,6 +8,9 @@ pub struct RenderedFrame {
 mod private {
 	pub trait Sealed {}
 
+	#[cfg(feature = "cpu")]
+	impl<const W: usize, const H: usize> Sealed for crate::cpu_render::CpuRenderer<W, H> {}
+
 	#[cfg(feature = "gpu")]
 	impl<const W: usize, const H: usize> Sealed for crate::gpu_render::WgpuRenderer<W, H> {}
 }

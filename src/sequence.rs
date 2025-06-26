@@ -3,19 +3,19 @@ use std::collections::{HashMap, VecDeque, HashSet};
 use core::num::NonZeroU8;
 
 #[derive(Clone)]
-pub struct Frame<const W: usize, const H: usize> {
-	grid: Grid<W, H>,
+pub struct Frame {
+	grid: Grid,
 	pub frame_hold: NonZeroU8
 }
 
-impl<const W: usize, const H: usize> Frame<W, H> {
+impl Frame {
 	/// display a grid for a single frame
-	pub fn single(grid: Grid<W, H>) -> Self {
+	pub fn single(grid: Grid) -> Self {
 		Self { grid, frame_hold: NonZeroU8::MIN }
 	}
 
 	/// hold on a grid for some amount of frames
-	pub fn variable(grid: Grid<W, H>, frame_hold: NonZeroU8) -> Self {
+	pub fn variable(grid: Grid, frame_hold: NonZeroU8) -> Self {
 		Self { grid, frame_hold }
 	}
 
@@ -70,14 +70,14 @@ impl From<Pt> for FontSize {
 	}
 }
 
-pub struct GridSequence<const W: usize, const H: usize> {
+pub struct GridSequence {
 	pub framerate: NonZeroU8,
-	frames: VecDeque<Frame<W, H>>,
+	frames: VecDeque<Frame>,
 	pub font_scale: FontSize,
 	glyph_set: HashSet<char>
 }
 
-impl<const W: usize, const H: usize> GridSequence<W, H> {
+impl GridSequence {
 	pub fn new(s: impl Into<FontSize>) -> Self {
 		Self {
 			framerate: NonZeroU8::MIN,
@@ -88,7 +88,7 @@ impl<const W: usize, const H: usize> GridSequence<W, H> {
 	}
 
 	/// push a frame to the beginning of the sequence
-	pub fn prepend(&mut self, frame: Frame<W, H>) {
+	pub fn prepend(&mut self, frame: Frame) {
 		for c in frame.grid.chars() {
 			self.glyph_set.insert(c);
 		}
@@ -97,7 +97,7 @@ impl<const W: usize, const H: usize> GridSequence<W, H> {
 	}
 
 	/// push a frame to the end of the sequence
-	pub fn append(&mut self, frame: Frame<W, H>) {
+	pub fn append(&mut self, frame: Frame) {
 		for c in frame.grid.chars() {
 			self.glyph_set.insert(c);
 		}
@@ -111,7 +111,7 @@ impl<const W: usize, const H: usize> GridSequence<W, H> {
 	}
 
 	#[inline]
-	pub(crate) fn pop(&mut self) -> Option<Frame<W, H>> {
+	pub(crate) fn pop(&mut self) -> Option<Frame> {
 		self.frames.pop_front()
 	}
 
