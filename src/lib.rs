@@ -11,3 +11,6 @@ mod atlas;
 
 #[cfg(feature = "video")]
 pub mod video;
+
+#[cfg(feature = "gpu")]
+pub mod gpu_render;

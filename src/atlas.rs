@@ -11,9 +11,13 @@ pub(crate) struct Atlas {
 
 // partially aesthetic, partially a `wgpu` hack for buffer alignment
 fn round_up_aligned(n: u32) -> u32 {
-	use wgpu::COPY_BUFFER_ALIGNMENT as ALIGN;
+	#[cfg(feature = "gpu")]
+	const ALIGN: u32 = wgpu::COPY_BUFFER_ALIGNMENT as u32;
 
-	(ALIGN as u32 * (n / ALIGN as u32)) + ALIGN as u32
+	#[cfg(not(feature = "gpu"))]
+	const ALIGN: u32 = 4;
+
+	(ALIGN * (n / ALIGN)) + ALIGN
 }
 
 // upper bound of size for the biggest glyph
